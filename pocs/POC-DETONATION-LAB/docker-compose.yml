@@ -1,0 +1,21 @@
+# Lab network sinkhole — HTTP + DNS stub for detonation guests.
+# Bind to lab / host-only interface only; do not expose to the public internet.
+services:
+  http-sink:
+    image: nginx:1.27-alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./sinkhole/http:/usr/share/nginx/html:ro
+      - ./sinkhole/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+  dns-sink:
+    image: strm/dnsmasq
+    cap_add: ["NET_ADMIN"]
+    ports:
+      - "5353:53/udp"
+      - "5353:53/tcp"
+    volumes:
+      - ./sinkhole/dnsmasq.conf:/etc/dnsmasq.conf:ro
+    restart: unless-stopped

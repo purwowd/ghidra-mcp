@@ -1,0 +1,3 @@
+Read ai_agent_instructions/00–20 (see INDEX.md). Prioritize 13 (PoC), 14 (red team),
+and 20 (horizon 2026–2031). Confirm: full-attack packages; --mode full as primary
+reproduce command; framework is 5-year-tuned (not timeless).

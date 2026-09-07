@@ -1,0 +1,8 @@
+# Ghidra Cursor Assist (Maven extension)
+/target/
+*.class
+*.jar
+*.zip
+.classpath
+.project
+.settings/

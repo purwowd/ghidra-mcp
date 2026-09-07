@@ -1,0 +1,8 @@
+# Local evidence — keep malware binaries out of git
+evidence/
+reports/*/dynamic/evidence/
+*.exe
+*.dll
+*.sys
+*.bin
+.snapshots-meta/

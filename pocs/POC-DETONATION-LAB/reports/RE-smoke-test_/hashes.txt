@@ -1,0 +1,2 @@
+# sha256  filename_note
+# (paste after hashing inside the VM or on an isolated volume)

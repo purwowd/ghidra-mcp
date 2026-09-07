@@ -1,0 +1,10 @@
+# Challenge sources & answer keys — force RE via Ghidra MCP, not reading C.
+samples/**/src/
+samples/**/README.md
+samples/**/**/*.dSYM/
+
+# Heavy upstream clone / build artifacts
+mcp-server/target/
+mcp-server/.venv/
+mcp-server/dist/
+mcp-server/**/__pycache__/

@@ -1,0 +1,18 @@
+---
+description: Prefer Ghidra MCP for reverse-engineering binaries in this lab
+alwaysApply: true
+---
+
+# Ghidra MCP reverse-engineering
+
+When the task is analyzing, solving, or documenting a binary under `samples/` (or any program open in Ghidra):
+
+1. Use the **ghidra** MCP tools (`list_methods` / list functions, decompile, strings, memory reads, etc.).
+2. Do **not** open or cite challenge **source** under `samples/**/src/` to obtain passwords or flags.
+3. Do **not** use README answer tables as the primary solution path; treat them as post-hoc verification only if the user asks.
+4. Always identify the **active / requested program** (`chal_symbols`, `chal_stripped`, …). If both are open, ask which one or use `is_current`.
+5. For stripped binaries, expect `FUN_*` names, obfuscation (XOR/etc.), and reconstruct logic from decompiler output.
+6. If MCP is down (`Connection failed` / no tools), tell the user to open CodeBrowser and check `http://127.0.0.1:8089/mcp/health` — do not invent decompilation.
+
+Copy-paste prompts: `prompts/rev-mcp.md`.
+Launch helper: `scripts/ghidra-lab.sh`.
