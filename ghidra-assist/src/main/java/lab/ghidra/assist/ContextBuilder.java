@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import ghidra.app.services.CodeViewerService;
 import ghidra.framework.plugintool.PluginTool;
@@ -11,7 +11,7 @@ import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.util.ProgramLocation;
 
 /**
- * Builds a preamble with active Ghidra program / cursor context for Cursor Agent.
+ * Builds a preamble with active Ghidra program / cursor context for the assistant backends.
  */
 public final class ContextBuilder {
 

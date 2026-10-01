@@ -103,7 +103,7 @@ EOF
 fi
 
 echo
-echo "[*] Approve / check Cursor MCP:"
+echo "[*] Approve / check MCP (Cursor backend):"
 echo "    agent mcp enable ghidra && agent mcp list"
 echo "[*] Chat:"
 echo "    cd $ROOT && agent --trust --approve-mcps"

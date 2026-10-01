@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import ghidra.app.plugin.ProgramPlugin;
 import ghidra.framework.options.Options;
@@ -9,20 +9,20 @@ import ghidra.program.model.listing.Program;
 import ghidra.util.HelpLocation;
 
 /**
- * CodeBrowser plugin: dockable chat UI backed by Cursor Agent CLI.
+ * CodeBrowser plugin: dockable chat UI backed by the Cursor and DeepSeek backends.
  */
 //@formatter:off
 @PluginInfo(
     status = PluginStatus.RELEASED,
-    packageName = "GhidraCursorAssist",
+    packageName = "GhidraAssist",
     category = "Analysis",
-    shortDescription = "Cursor Agent chat panel",
-    description = "In-Ghidra chat that runs Cursor Agent CLI with GhidraMCP tools."
+    shortDescription = "Ghidra Assist chat panel",
+    description = "In-Ghidra chat that runs the Cursor or DeepSeek backends with GhidraMCP tools."
 )
 //@formatter:on
-public class GhidraCursorAssistPlugin extends ProgramPlugin {
+public class GhidraAssistPlugin extends ProgramPlugin {
 
-    public static final String OPTIONS_NAME = "Cursor Assist";
+    public static final String OPTIONS_NAME = "Ghidra Assist";
 
     public static final String OPT_AGENT_PATH = "Agent binary path";
     public static final String OPT_WORKSPACE = "Workspace directory";
@@ -30,19 +30,23 @@ public class GhidraCursorAssistPlugin extends ProgramPlugin {
     public static final String OPT_EXTRA_ARGS = "Extra agent args";
     public static final String OPT_MCP_URL = "GhidraMCP base URL";
     public static final String OPT_INJECT_CONTEXT = "Inject Ghidra context by default";
+    public static final String OPT_DS_API_KEY = "DeepSeek API key";
+    public static final String OPT_DS_BASE_URL = "DeepSeek base URL";
+    public static final String OPT_DS_MODEL_V4_PRO = "DeepSeek V4 Pro model id";
+    public static final String OPT_DS_MODEL_FLASH = "DeepSeek Flash model id";
 
-    private CursorAssistProvider provider;
+    private AssistProvider provider;
 
-    public GhidraCursorAssistPlugin(PluginTool tool) {
+    public GhidraAssistPlugin(PluginTool tool) {
         super(tool);
-        provider = new CursorAssistProvider(this);
+        provider = new AssistProvider(this);
         tool.addComponentProvider(provider, false);
         registerOptions();
     }
 
     private void registerOptions() {
         Options options = tool.getOptions(OPTIONS_NAME);
-        HelpLocation help = new HelpLocation("GhidraCursorAssist", "Options");
+        HelpLocation help = new HelpLocation("GhidraAssist", "Options");
 
         options.registerOption(OPT_AGENT_PATH, "", help,
             "Absolute path to the Cursor Agent CLI (agent). Empty = auto-detect ~/.local/bin/agent");
@@ -50,13 +54,21 @@ public class GhidraCursorAssistPlugin extends ProgramPlugin {
             System.getProperty("user.home") + "/Developments/personal/ghidra-mcp", help,
             "Workspace passed to agent --workspace (should contain .cursor/mcp.json)");
         options.registerOption(OPT_MODEL, "", help,
-            "Optional --model value for Cursor Agent");
+            "Optional --model value for the assistant backends");
         options.registerOption(OPT_EXTRA_ARGS, "", help,
             "Extra args appended to agent (space-separated)");
         options.registerOption(OPT_MCP_URL, "http://127.0.0.1:8089", help,
             "GhidraMCP HTTP base URL for health checks");
         options.registerOption(OPT_INJECT_CONTEXT, true, help,
             "Default for the Inject context checkbox");
+        options.registerOption(OPT_DS_API_KEY, "", help,
+            "DeepSeek API key. Empty = read DEEPSEEK_API_KEY environment variable");
+        options.registerOption(OPT_DS_BASE_URL, "https://api.deepseek.com", help,
+            "DeepSeek OpenAI-compatible base URL (no trailing slash)");
+        options.registerOption(OPT_DS_MODEL_V4_PRO, "deepseek-v4-pro", help,
+            "API model id used when the panel selects DeepSeek V4 Pro");
+        options.registerOption(OPT_DS_MODEL_FLASH, "deepseek-flash", help,
+            "API model id used when the panel selects DeepSeek Flash");
     }
 
     Options getAssistOptions() {

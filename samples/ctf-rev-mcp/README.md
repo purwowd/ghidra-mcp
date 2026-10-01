@@ -1,6 +1,6 @@
 # CTF reverse samples — Ghidra MCP smoke test
 
-Two tiny arm64 macOS crackmes for verifying Cursor ↔ Ghidra MCP.
+Two tiny arm64 macOS crackmes for verifying Ghidra MCP.
 
 | Binary | Symbols | Password | Flag |
 |--------|---------|----------|------|
@@ -22,7 +22,7 @@ make check
 3. Open each in CodeBrowser (auto-analyze).
 4. Confirm MCP listens on `http://127.0.0.1:8089`.
 
-## MCP test prompts (Cursor Agent)
+## MCP test prompts (AI backends)
 
 Use the shared pack (preferred): [`../../prompts/rev-mcp.md`](../../prompts/rev-mcp.md)
 

@@ -1,7 +1,7 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 /**
- * Classifies Cursor Agent --output-format stream-json lines into UI events.
+ * Classifies the Cursor backend --output-format stream-json lines into UI events.
  */
 public final class StreamJsonParser {
 

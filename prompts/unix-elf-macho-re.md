@@ -38,7 +38,7 @@ You recover **behavior**, not the original `.c` tree.
 
 # 2) Import unpacked into Ghidra → Analyze
 
-# 3) Cursor Assist → Tools ▾ → App flow
+# 3) Ghidra Assist → Tools ▾ → App flow
 #    or agent: program_flow_report
 ```
 

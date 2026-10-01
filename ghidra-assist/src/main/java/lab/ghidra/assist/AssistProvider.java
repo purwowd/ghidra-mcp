@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -14,6 +14,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JEditorPane;
 import javax.swing.JLabel;
@@ -41,11 +42,15 @@ import ghidra.util.Msg;
 import resources.Icons;
 
 /**
- * Dockable chat panel for Cursor Agent.
+ * Dockable chat panel for the Ghidra Assist backends.
  */
-public class CursorAssistProvider extends ComponentProvider {
+public class AssistProvider extends ComponentProvider {
 
-    private final GhidraCursorAssistPlugin plugin;
+    private static final String BACKEND_CURSOR = "Cursor";
+    private static final String BACKEND_DS_V4_PRO = "DeepSeek V4 Pro";
+    private static final String BACKEND_DS_FLASH = "DeepSeek Flash";
+
+    private final GhidraAssistPlugin plugin;
     private final JPanel mainPanel;
     private final JEditorPane transcript;
     private final JScrollPane transcriptScroll;
@@ -60,26 +65,37 @@ public class CursorAssistProvider extends ComponentProvider {
     private final JButton newChatButton;
     private final JButton toolsButton;
     private final JButton loadPromptButton;
+    private final JComboBox<String> backendBox;
     private final JPopupMenu toolsMenu;
 
     private final AgentProcessRunner runner;
+    private final DeepSeekRunner deepseekRunner;
     private final StringBuilder markdownLog = new StringBuilder();
     private PromptPresets.Preset activePreset;
     private String chatId;
     private Program activeProgram;
-    private boolean refreshScheduled;
+    private boolean renderDirty;
     private int lastSavedLogLength;
     private Timer thinkingTimer;
+    private Timer renderTimer;
     private int thinkingTick;
     private String thinkingBase = "Thinking";
     private boolean awaitingFirstChunk;
 
-    public CursorAssistProvider(GhidraCursorAssistPlugin plugin) {
-        super(plugin.getTool(), "Cursor Assist", plugin.getName());
+    public AssistProvider(GhidraAssistPlugin plugin) {
+        super(plugin.getTool(), "Ghidra Assist", plugin.getName());
         this.plugin = plugin;
         this.runner = new AgentProcessRunner();
+        this.deepseekRunner = new DeepSeekRunner();
 
         setDefaultWindowPosition(docking.WindowPosition.RIGHT);
+
+        boolean dark = MarkdownLite.preferDark();
+        Color chromeBg = dark ? new Color(0x30, 0x30, 0x30) : new Color(0xF2, 0xF2, 0xF2);
+        Color chromeBorder = dark ? new Color(0x4A, 0x4A, 0x4A) : new Color(0xD5, 0xD5, 0xD5);
+        Color accent = dark ? new Color(0x9C, 0xCC, 0x65) : new Color(0x1B, 0x5E, 0x20);
+        Color bannerBg = dark ? new Color(0x33, 0x33, 0x33) : new Color(0xF0, 0xF4, 0xF8);
+        Color bannerFg = dark ? new Color(0xB0, 0xBE, 0xC5) : new Color(0x54, 0x6E, 0x7A);
 
         transcript = new JEditorPane();
         transcript.setEditable(false);
@@ -106,12 +122,6 @@ public class CursorAssistProvider extends ComponentProvider {
         thinkingBanner.setFont(thinkingBanner.getFont().deriveFont(Font.ITALIC, 12f));
         thinkingBanner.setBorder(BorderFactory.createEmptyBorder(6, 12, 8, 12));
         thinkingBanner.setOpaque(true);
-        Color bannerBg = MarkdownLite.preferDark()
-            ? new Color(0x33, 0x33, 0x33)
-            : new Color(0xF0, 0xF4, 0xF8);
-        Color bannerFg = MarkdownLite.preferDark()
-            ? new Color(0xB0, 0xBE, 0xC5)
-            : new Color(0x54, 0x6E, 0x7A);
         thinkingBanner.setBackground(bannerBg);
         thinkingBanner.setForeground(bannerFg);
 
@@ -137,7 +147,8 @@ public class CursorAssistProvider extends ComponentProvider {
         statusLabel = new JLabel("Ready");
         statusLabel.setFont(statusLabel.getFont().deriveFont(Font.PLAIN, 11f));
         programLabel = new JLabel("No program");
-        programLabel.setFont(programLabel.getFont().deriveFont(Font.BOLD, 12f));
+        programLabel.setFont(programLabel.getFont().deriveFont(Font.BOLD, 13f));
+        programLabel.setForeground(accent);
         mcpDot = new JLabel("●");
         mcpDot.setToolTipText("MCP status unknown — Ping from Tools");
         mcpDot.setForeground(new Color(0x88, 0x88, 0x88));
@@ -145,7 +156,7 @@ public class CursorAssistProvider extends ComponentProvider {
         injectContext = new JCheckBox("Context", true);
         injectContext.setToolTipText("Inject Ghidra program/cursor + prior findings into the agent prompt");
         Options opts = plugin.getAssistOptions();
-        injectContext.setSelected(opts.getBoolean(GhidraCursorAssistPlugin.OPT_INJECT_CONTEXT, true));
+        injectContext.setSelected(opts.getBoolean(GhidraAssistPlugin.OPT_INJECT_CONTEXT, true));
 
         sendButton = compactButton("Send");
         stopButton = compactButton("Stop");
@@ -156,6 +167,13 @@ public class CursorAssistProvider extends ComponentProvider {
         stopButton.setEnabled(false);
         loadPromptButton.setEnabled(false);
 
+        backendBox = new JComboBox<>(new String[] {
+            BACKEND_CURSOR, BACKEND_DS_V4_PRO, BACKEND_DS_FLASH
+        });
+        backendBox.setToolTipText("AI backend / model used on Send");
+        backendBox.setFocusable(false);
+        backendBox.setMaximumSize(new Dimension(Short.MAX_VALUE, 26));
+
         toolsMenu = buildToolsMenu();
         toolsButton.addActionListener(e ->
             toolsMenu.show(toolsButton, 0, toolsButton.getHeight()));
@@ -165,25 +183,44 @@ public class CursorAssistProvider extends ComponentProvider {
         newChatButton.addActionListener(e -> newChat());
         loadPromptButton.addActionListener(e -> loadActivePrompt());
 
-        // Header: program + MCP dot | tools | new
+        // Header: two rows — (1) program + backend, (2) tools
         JPanel header = new JPanel();
-        header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        header.setBorder(BorderFactory.createEmptyBorder(8, 10, 6, 10));
-        header.add(mcpDot);
-        header.add(Box.createHorizontalStrut(6));
-        header.add(programLabel);
-        header.add(Box.createHorizontalGlue());
-        header.add(injectContext);
-        header.add(Box.createHorizontalStrut(6));
-        header.add(loadPromptButton);
-        header.add(Box.createHorizontalStrut(4));
-        header.add(toolsButton);
-        header.add(Box.createHorizontalStrut(4));
-        header.add(newChatButton);
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setBackground(chromeBg);
+        header.setOpaque(true);
+        header.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, chromeBorder),
+            BorderFactory.createEmptyBorder(6, 12, 6, 12)));
+
+        JPanel topRow = new JPanel();
+        topRow.setLayout(new BoxLayout(topRow, BoxLayout.X_AXIS));
+        topRow.setOpaque(false);
+        topRow.add(mcpDot);
+        topRow.add(Box.createHorizontalStrut(6));
+        topRow.add(programLabel);
+        topRow.add(Box.createHorizontalGlue());
+        topRow.add(backendBox);
+
+        JPanel toolRow = new JPanel();
+        toolRow.setLayout(new BoxLayout(toolRow, BoxLayout.X_AXIS));
+        toolRow.setOpaque(false);
+        toolRow.add(injectContext);
+        toolRow.add(Box.createHorizontalGlue());
+        toolRow.add(loadPromptButton);
+        toolRow.add(Box.createHorizontalStrut(4));
+        toolRow.add(toolsButton);
+        toolRow.add(Box.createHorizontalStrut(4));
+        toolRow.add(newChatButton);
+
+        header.add(topRow);
+        header.add(Box.createVerticalStrut(4));
+        header.add(toolRow);
 
         JPanel composer = new JPanel(new BorderLayout(6, 4));
+        composer.setBackground(chromeBg);
+        composer.setOpaque(true);
         composer.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(0x55, 0x55, 0x55)),
+            BorderFactory.createMatteBorder(1, 0, 0, 0, chromeBorder),
             BorderFactory.createEmptyBorder(8, 10, 8, 10)));
         JPanel sendCol = new JPanel();
         sendCol.setLayout(new BoxLayout(sendCol, BoxLayout.Y_AXIS));
@@ -191,19 +228,19 @@ public class CursorAssistProvider extends ComponentProvider {
         sendCol.add(Box.createVerticalStrut(4));
         sendCol.add(stopButton);
         JScrollPane inputScroll = new JScrollPane(input);
-        inputScroll.setBorder(BorderFactory.createEmptyBorder());
+        inputScroll.setBorder(BorderFactory.createMatteBorder(1, 1, 1, 1, chromeBorder));
         composer.add(inputScroll, BorderLayout.CENTER);
         composer.add(sendCol, BorderLayout.EAST);
         composer.add(statusLabel, BorderLayout.SOUTH);
 
         mainPanel = new JPanel(new BorderLayout());
-        mainPanel.setPreferredSize(new Dimension(420, 680));
+        mainPanel.setPreferredSize(new Dimension(480, 680));
         mainPanel.add(header, BorderLayout.NORTH);
         mainPanel.add(transcriptWrap, BorderLayout.CENTER);
         mainPanel.add(composer, BorderLayout.SOUTH);
 
         createActions();
-        appendSystem("Cursor Assist ready.");
+        appendSystem("Ghidra Assist ready.");
         onProgramChanged(plugin.getCurrentProgramPublic());
         // Soft ping MCP in background for the status dot
         SwingUtilities.invokeLater(this::pingHealthQuiet);
@@ -231,6 +268,9 @@ public class CursorAssistProvider extends ComponentProvider {
         menu.add(new JSeparator());
         menu.add(item("Sync bookmarks", e -> syncBookmarks()));
         menu.add(item("Save findings", e -> saveFindingsNow()));
+        menu.add(new JSeparator());
+        menu.add(item("Store DeepSeek key (Keychain)…", e -> storeDeepSeekKeyDialog()));
+        menu.add(item("Clear DeepSeek key (Keychain)", e -> clearDeepSeekKey()));
         return menu;
     }
 
@@ -238,6 +278,32 @@ public class CursorAssistProvider extends ComponentProvider {
         JMenuItem mi = new JMenuItem(label);
         mi.addActionListener(action);
         return mi;
+    }
+
+    private void storeDeepSeekKeyDialog() {
+        javax.swing.JPasswordField pf = new javax.swing.JPasswordField(32);
+        int choice = javax.swing.JOptionPane.showConfirmDialog(mainPanel, pf,
+            "Store DeepSeek API key in macOS Keychain",
+            javax.swing.JOptionPane.OK_CANCEL_OPTION);
+        if (choice != javax.swing.JOptionPane.OK_OPTION) {
+            return;
+        }
+        String key = new String(pf.getPassword()).trim();
+        if (key.isEmpty()) {
+            setStatus("Key empty — not stored");
+            return;
+        }
+        boolean ok = KeychainStore.store(key);
+        appendSystem(ok ? "DeepSeek key stored in macOS Keychain."
+            : "Keychain store failed (see Ghidra log).");
+        setStatus(ok ? "DeepSeek key stored in Keychain" : "Keychain store failed");
+    }
+
+    private void clearDeepSeekKey() {
+        boolean ok = KeychainStore.clear();
+        appendSystem(ok ? "DeepSeek key removed from macOS Keychain."
+            : "Keychain clear failed.");
+        setStatus(ok ? "DeepSeek key cleared" : "Keychain clear failed");
     }
 
     private void setStatus(String text) {
@@ -263,14 +329,14 @@ public class CursorAssistProvider extends ComponentProvider {
     }
 
     private void createActions() {
-        DockingAction show = new DockingAction("Cursor Assist", getOwner()) {
+        DockingAction show = new DockingAction("Ghidra Assist", getOwner()) {
             @Override
             public void actionPerformed(ActionContext context) {
-                getTool().showComponentProvider(CursorAssistProvider.this, true);
+                getTool().showComponentProvider(AssistProvider.this, true);
             }
         };
         show.setToolBarData(new ToolBarData(Icons.HELP_ICON, null));
-        show.setDescription("Show Cursor Assist chat");
+        show.setDescription("Show Ghidra Assist chat");
         show.setEnabled(true);
         addLocalAction(show);
     }
@@ -306,7 +372,7 @@ public class CursorAssistProvider extends ComponentProvider {
         }
 
         Options opts = plugin.getAssistOptions();
-        String workspace = opts.getString(GhidraCursorAssistPlugin.OPT_WORKSPACE,
+        String workspace = opts.getString(GhidraAssistPlugin.OPT_WORKSPACE,
             System.getProperty("user.home") + "/Developments/personal/ghidra-mcp");
         String prior = FindingsStore.load(workspace, program);
         if (!prior.isBlank()) {
@@ -352,7 +418,7 @@ public class CursorAssistProvider extends ComponentProvider {
             return;
         }
         Options opts = plugin.getAssistOptions();
-        String workspace = opts.getString(GhidraCursorAssistPlugin.OPT_WORKSPACE,
+        String workspace = opts.getString(GhidraAssistPlugin.OPT_WORKSPACE,
             System.getProperty("user.home") + "/Developments/personal/ghidra-mcp");
         try {
             FindingsStore.saveFull(workspace, p, markdownLog.toString());
@@ -377,7 +443,7 @@ public class CursorAssistProvider extends ComponentProvider {
             return;
         }
         Options opts = plugin.getAssistOptions();
-        String workspace = opts.getString(GhidraCursorAssistPlugin.OPT_WORKSPACE,
+        String workspace = opts.getString(GhidraAssistPlugin.OPT_WORKSPACE,
             System.getProperty("user.home") + "/Developments/personal/ghidra-mcp");
         String findings = FindingsStore.load(workspace, p);
         if (findings.isBlank()) {
@@ -434,11 +500,11 @@ public class CursorAssistProvider extends ComponentProvider {
             return;
         }
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String body = McpHttpClient.jsonObject(java.util.Map.of(
             "address", addr,
             "hex", hex,
-            "note", "CursorAssist Patch bytes",
+            "note", "GhidraAssist Patch bytes",
             "program", p.getName()));
         setStatus("Patching…");
         Thread t = new Thread(() -> {
@@ -453,7 +519,7 @@ public class CursorAssistProvider extends ComponentProvider {
                     setStatus("Patch failed");
                 }
             });
-        }, "CursorAssist-Patch");
+        }, "GhidraAssist-Patch");
         t.setDaemon(true);
         t.start();
     }
@@ -461,7 +527,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runDebugStrcmpRecipe() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
 
         // Prefer MCP breakpoint; also load agent recipe into input for follow-up.
@@ -492,7 +558,7 @@ public class CursorAssistProvider extends ComponentProvider {
                     setStatus("Debug MCP call failed — recipe loaded in input");
                 }
             });
-        }, "CursorAssist-Debug");
+        }, "GhidraAssist-Debug");
         t.setDaemon(true);
         t.start();
     }
@@ -500,7 +566,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runAppFlow() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String path = "/program_flow_report" + (prog.isEmpty() ? ""
             : "?program=" + java.net.URLEncoder.encode(prog, java.nio.charset.StandardCharsets.UTF_8));
@@ -522,7 +588,7 @@ public class CursorAssistProvider extends ComponentProvider {
                 appendSystem("program_flow_report → " + truncate(r.body, 520));
                 setStatus(r.ok ? "App flow OK — Send for narrative" : "App flow failed (redeploy MCP?)");
             });
-        }, "CursorAssist-AppFlow");
+        }, "GhidraAssist-AppFlow");
         t.setDaemon(true);
         t.start();
     }
@@ -530,7 +596,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runCBinaryTriage() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String path = "/c_binary_triage" + (prog.isEmpty() ? ""
             : "?program=" + java.net.URLEncoder.encode(prog, java.nio.charset.StandardCharsets.UTF_8));
@@ -544,7 +610,7 @@ public class CursorAssistProvider extends ComponentProvider {
                 appendSystem("c_binary_triage → " + truncate(r.body, 480));
                 setStatus(r.ok ? "C triage OK — Send to let agent decompile" : "C triage failed (redeploy MCP?)");
             });
-        }, "CursorAssist-CTriage");
+        }, "GhidraAssist-CTriage");
         t.setDaemon(true);
         t.start();
     }
@@ -552,7 +618,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runUnpackWorkflow() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String path = "/unpack_workflow" + (prog.isEmpty() ? ""
             : "?program=" + java.net.URLEncoder.encode(prog, java.nio.charset.StandardCharsets.UTF_8));
@@ -572,7 +638,7 @@ public class CursorAssistProvider extends ComponentProvider {
                 appendSystem("unpack_workflow → " + truncate(r.body, 480));
                 setStatus(r.ok ? "Unpack playbook OK — Send" : "Unpack workflow failed");
             });
-        }, "CursorAssist-Unpack");
+        }, "GhidraAssist-Unpack");
         t.setDaemon(true);
         t.start();
     }
@@ -580,7 +646,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runDetonationPlaybook() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String q = prog.isEmpty() ? ""
             : "?program=" + java.net.URLEncoder.encode(prog, java.nio.charset.StandardCharsets.UTF_8);
@@ -600,7 +666,7 @@ public class CursorAssistProvider extends ComponentProvider {
                 appendSystem("detonation_playbook → " + truncate(r.body, 480));
                 setStatus(r.ok ? "Detonation playbook OK — Send" : "Detonation playbook failed");
             });
-        }, "CursorAssist-Detonate");
+        }, "GhidraAssist-Detonate");
         t.setDaemon(true);
         t.start();
     }
@@ -608,7 +674,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runKernelTriage() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String enc = prog.isEmpty() ? ""
             : "?program=" + java.net.URLEncoder.encode(prog, java.nio.charset.StandardCharsets.UTF_8);
@@ -630,7 +696,7 @@ public class CursorAssistProvider extends ComponentProvider {
                 appendSystem("kernel_debug_playbook → " + truncate(r2.body, 320));
                 setStatus(r.ok ? "Kernel triage OK — Send" : "Kernel triage failed");
             });
-        }, "CursorAssist-Kernel");
+        }, "GhidraAssist-Kernel");
         t.setDaemon(true);
         t.start();
     }
@@ -638,7 +704,7 @@ public class CursorAssistProvider extends ComponentProvider {
     private void runMalwareTriage() {
         Program p = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String path = "/malware_triage" + (prog.isEmpty() ? ""
             : "?program=" + java.net.URLEncoder.encode(prog, java.nio.charset.StandardCharsets.UTF_8));
@@ -658,7 +724,7 @@ public class CursorAssistProvider extends ComponentProvider {
                 appendSystem("malware_triage → " + truncate(r.body, 400));
                 setStatus(r.ok ? "Triage OK — see System + Send recipe" : "Triage failed");
             });
-        }, "CursorAssist-Triage");
+        }, "GhidraAssist-Triage");
         t.setDaemon(true);
         t.start();
     }
@@ -672,7 +738,7 @@ public class CursorAssistProvider extends ComponentProvider {
             return;
         }
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         String prog = p != null ? p.getName() : "";
         String body = McpHttpClient.jsonObject(java.util.Map.of(
             "name", api.trim(),
@@ -691,7 +757,7 @@ public class CursorAssistProvider extends ComponentProvider {
                     ? "WinAPI break requested — open Debugger & resume"
                     : "Break failed — check Debugger session");
             });
-        }, "CursorAssist-BreakAPI");
+        }, "GhidraAssist-BreakAPI");
         t.setDaemon(true);
         t.start();
     }
@@ -713,7 +779,7 @@ public class CursorAssistProvider extends ComponentProvider {
         }
         String chunk = markdownLog.substring(lastSavedLogLength);
         Options opts = plugin.getAssistOptions();
-        String workspace = opts.getString(GhidraCursorAssistPlugin.OPT_WORKSPACE,
+        String workspace = opts.getString(GhidraAssistPlugin.OPT_WORKSPACE,
             System.getProperty("user.home") + "/Developments/personal/ghidra-mcp");
         try {
             FindingsStore.append(workspace, p, chunk);
@@ -744,7 +810,7 @@ public class CursorAssistProvider extends ComponentProvider {
 
     private void pingHealth(boolean noisy) {
         Options opts = plugin.getAssistOptions();
-        String url = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
+        String url = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "http://127.0.0.1:8089");
         if (noisy) {
             setStatus("Pinging MCP…");
         }
@@ -757,7 +823,7 @@ public class CursorAssistProvider extends ComponentProvider {
                     appendSystem(r.ok ? "MCP OK" : "MCP FAIL — " + r.detail);
                 }
             });
-        }, "CursorAssist-Health");
+        }, "GhidraAssist-Health");
         t.setDaemon(true);
         t.start();
     }
@@ -767,16 +833,21 @@ public class CursorAssistProvider extends ComponentProvider {
         if (userText.isEmpty()) {
             return;
         }
-        if (runner.isRunning()) {
-            Msg.showWarn(this, mainPanel, "Cursor Assist", "Agent is already running. Stop it first.");
+        if (runner.isRunning() || deepseekRunner.isRunning()) {
+            Msg.showWarn(this, mainPanel, "Ghidra Assist",
+                "An assistant is already running. Stop it first.");
             return;
         }
 
         Options opts = plugin.getAssistOptions();
-        AgentProcessRunner.Config cfg = AgentProcessRunner.Config.fromOptions(opts);
+        String backend = backendBox.getSelectedItem() == null
+            ? BACKEND_CURSOR : backendBox.getSelectedItem().toString();
+        boolean deepseek = !BACKEND_CURSOR.equals(backend);
+        String mcpUrl = opts.getString(GhidraAssistPlugin.OPT_MCP_URL,
+            "http://127.0.0.1:8089");
 
         // Preflight health (non-blocking warning only)
-        McpHealthChecker.Result health = McpHealthChecker.check(cfg.mcpUrl);
+        McpHealthChecker.Result health = McpHealthChecker.check(mcpUrl);
         if (!health.ok) {
             int choice = javax.swing.JOptionPane.showConfirmDialog(mainPanel,
                 health.detail + "\n\nSend anyway?", "MCP health",
@@ -790,7 +861,7 @@ public class CursorAssistProvider extends ComponentProvider {
         String prompt = userText;
         if (injectContext.isSelected()) {
             Program prog = activeProgram != null ? activeProgram : plugin.getCurrentProgramPublic();
-            String workspace = opts.getString(GhidraCursorAssistPlugin.OPT_WORKSPACE,
+            String workspace = opts.getString(GhidraAssistPlugin.OPT_WORKSPACE,
                 System.getProperty("user.home") + "/Developments/personal/ghidra-mcp");
             String prior = prog != null ? FindingsStore.load(workspace, prog) : "";
             prompt = ContextBuilder.buildPrompt(plugin.getTool(), prog, userText, prior);
@@ -803,6 +874,13 @@ public class CursorAssistProvider extends ComponentProvider {
         setStatus("Thinking…");
 
         final String promptFinal = prompt;
+
+        if (deepseek) {
+            sendDeepSeek(opts, backend, mcpUrl, promptFinal);
+            return;
+        }
+
+        final AgentProcessRunner.Config cfg = AgentProcessRunner.Config.fromOptions(opts);
         Thread t = new Thread(() -> {
             try {
                 if (chatId == null || chatId.isBlank()) {
@@ -814,64 +892,111 @@ public class CursorAssistProvider extends ComponentProvider {
                 runner.runPrompt(cfg, chatId, promptFinal, new AgentProcessRunner.Listener() {
                     @Override
                     public void onChunk(String text) {
-                        SwingUtilities.invokeLater(() -> {
-                            noteAssistantOutput();
-                            appendAssistantChunk(text);
-                        });
+                        dispatchChunk(text);
                     }
 
                     @Override
                     public void onStatus(String status) {
-                        SwingUtilities.invokeLater(() -> {
-                            if (status != null && !status.isBlank()) {
-                                if (status.startsWith("MCP:") || status.startsWith("done ")) {
-                                    updateThinkingActivity(status);
-                                }
-                                else if (status.toLowerCase().contains("thinking") ||
-                                    status.toLowerCase().startsWith("starting")) {
-                                    updateThinkingActivity(status);
-                                }
-                                else {
-                                    updateThinkingActivity(status);
-                                }
-                                setStatus(status);
-                            }
-                        });
+                        dispatchStatus(status);
                     }
 
                     @Override
                     public void onComplete(int exitCode) {
-                        SwingUtilities.invokeLater(() -> {
-                            stopThinking();
-                            appendAssistantChunk("\n");
-                            autoAppendFindings();
-                            setBusy(false);
-                            setStatus(exitCode == 0 ? "Done (findings auto-saved)" : "Exit code " + exitCode);
-                        });
+                        dispatchComplete(exitCode);
                     }
 
                     @Override
                     public void onError(String message) {
-                        SwingUtilities.invokeLater(() -> {
-                            stopThinking();
-                            appendSystem("ERROR: " + message);
-                            setBusy(false);
-                            setStatus("Error");
-                        });
+                        dispatchError(message);
                     }
                 });
             }
             catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> {
-                    stopThinking();
-                    appendSystem("ERROR: " + ex.getMessage());
-                    setBusy(false);
-                    setStatus("Error");
-                });
+                dispatchError(ex.getMessage());
             }
-        }, "CursorAssist-Agent");
+        }, "GhidraAssist-Agent");
         t.setDaemon(true);
         t.start();
+    }
+
+    private void sendDeepSeek(Options opts, String backend, String mcpUrl, String promptFinal) {
+        String modelId = BACKEND_DS_V4_PRO.equals(backend)
+            ? opts.getString(GhidraAssistPlugin.OPT_DS_MODEL_V4_PRO, "deepseek-v4-pro")
+            : opts.getString(GhidraAssistPlugin.OPT_DS_MODEL_FLASH, "deepseek-flash");
+        String key = opts.getString(GhidraAssistPlugin.OPT_DS_API_KEY, "").trim();
+        if (key.isEmpty()) {
+            key = System.getenv("DEEPSEEK_API_KEY");
+        }
+        if (key == null || key.isEmpty()) {
+            key = KeychainStore.get();
+        }
+        String baseUrl = opts.getString(GhidraAssistPlugin.OPT_DS_BASE_URL,
+            "https://api.deepseek.com");
+        DeepSeekRunner.Config cfg = new DeepSeekRunner.Config(key, baseUrl, modelId, mcpUrl);
+
+        setStatus("Thinking (DeepSeek " + backend + ")…");
+        Thread t = new Thread(() -> {
+            deepseekRunner.runPrompt(cfg, promptFinal, new DeepSeekRunner.Listener() {
+                @Override
+                public void onChunk(String text) {
+                    dispatchChunk(text);
+                }
+
+                @Override
+                public void onStatus(String status) {
+                    dispatchStatus(status);
+                }
+
+                @Override
+                public void onComplete(int exitCode) {
+                    dispatchComplete(exitCode);
+                }
+
+                @Override
+                public void onError(String message) {
+                    dispatchError(message);
+                }
+            });
+        }, "GhidraAssist-DeepSeek");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void dispatchChunk(String text) {
+        SwingUtilities.invokeLater(() -> {
+            noteAssistantOutput();
+            appendAssistantChunk(text);
+        });
+    }
+
+    private void dispatchStatus(String status) {
+        SwingUtilities.invokeLater(() -> {
+            if (status != null && !status.isBlank()) {
+                updateThinkingActivity(status);
+                setStatus(status);
+            }
+        });
+    }
+
+    private void dispatchComplete(int exitCode) {
+        SwingUtilities.invokeLater(() -> {
+            stopThinking();
+            appendAssistantChunk("\n");
+            renderNow();
+            autoAppendFindings();
+            setBusy(false);
+            setStatus(exitCode == 0 ? "Done (findings auto-saved)" : "Exit code " + exitCode);
+        });
+    }
+
+    private void dispatchError(String message) {
+        SwingUtilities.invokeLater(() -> {
+            stopThinking();
+            appendSystem("ERROR: " + message);
+            renderNow();
+            setBusy(false);
+            setStatus("Error");
+        });
     }
 
     private void startThinking(String base) {
@@ -954,6 +1079,7 @@ public class CursorAssistProvider extends ComponentProvider {
 
     private void stop() {
         runner.cancel();
+        deepseekRunner.cancel();
         stopThinking();
         setStatus("Stopping…");
     }
@@ -962,6 +1088,10 @@ public class CursorAssistProvider extends ComponentProvider {
         if (runner.isRunning()) {
             runner.cancel();
         }
+        if (deepseekRunner.isRunning()) {
+            deepseekRunner.cancel();
+        }
+        deepseekRunner.resetConversation();
         chatId = null;
         appendSystem("--- new chat ---");
         setStatus("New chat (next send creates a session)");
@@ -974,6 +1104,7 @@ public class CursorAssistProvider extends ComponentProvider {
         toolsButton.setEnabled(!busy);
         loadPromptButton.setEnabled(!busy && activePreset != null);
         injectContext.setEnabled(!busy);
+        backendBox.setEnabled(!busy);
         input.setEnabled(!busy);
     }
 
@@ -993,16 +1124,23 @@ public class CursorAssistProvider extends ComponentProvider {
     }
 
     private void scheduleRefresh() {
-        if (refreshScheduled) {
-            return;
+        renderDirty = true;
+        if (renderTimer == null) {
+            renderTimer = new Timer(120, e -> {
+                if (renderDirty) {
+                    renderDirty = false;
+                    renderNow();
+                }
+            });
+            renderTimer.setRepeats(true);
+            renderTimer.start();
         }
-        refreshScheduled = true;
-        SwingUtilities.invokeLater(() -> {
-            refreshScheduled = false;
-            String html = MarkdownLite.toHtmlDocument(markdownLog.toString());
-            transcript.setText(html);
-            transcript.setCaretPosition(transcript.getDocument().getLength());
-        });
+    }
+
+    private void renderNow() {
+        String html = MarkdownLite.toHtmlDocument(markdownLog.toString());
+        transcript.setText(html);
+        transcript.setCaretPosition(transcript.getDocument().getLength());
     }
 
     @Override
@@ -1025,6 +1163,11 @@ public class CursorAssistProvider extends ComponentProvider {
             thinkingTimer.stop();
             thinkingTimer = null;
         }
+        if (renderTimer != null) {
+            renderTimer.stop();
+            renderTimer = null;
+        }
+        deepseekRunner.cancel();
         runner.cancel();
     }
 }

@@ -14,21 +14,21 @@
             <includes>
                 <include>extension.properties</include>
             </includes>
-            <outputDirectory>GhidraCursorAssist</outputDirectory>
+            <outputDirectory>GhidraAssist</outputDirectory>
         </fileSet>
         <fileSet>
             <directory>src/main/resources</directory>
             <includes>
                 <include>Module.manifest</include>
             </includes>
-            <outputDirectory>GhidraCursorAssist</outputDirectory>
+            <outputDirectory>GhidraAssist</outputDirectory>
         </fileSet>
         <fileSet>
             <directory>${project.build.directory}</directory>
             <includes>
                 <include>${project.build.finalName}.jar</include>
             </includes>
-            <outputDirectory>GhidraCursorAssist/lib</outputDirectory>
+            <outputDirectory>GhidraAssist/lib</outputDirectory>
         </fileSet>
     </fileSets>
 </assembly>

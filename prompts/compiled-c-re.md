@@ -1,4 +1,4 @@
-# Compiled C/C++ RE — mechanism + Cursor Assist
+# Compiled C/C++ RE — mechanism + Ghidra Assist
 
 Lab cookbook. Goal: analyze **binaries built from C/C++**, not recover the original `.c` tree.
 
@@ -11,7 +11,7 @@ Lab cookbook. Goal: analyze **binaries built from C/C++**, not recover the origi
                                          │
                     disasm · functions · xrefs · decompiler (C-like)
                                          │
-                         GhidraMCP (:8089)  ←── Cursor Agent / Assist
+                         GhidraMCP (:8089)  ←── Cursor / DeepSeek backends
 ```
 
 | Layer | Role |
@@ -19,7 +19,7 @@ Lab cookbook. Goal: analyze **binaries built from C/C++**, not recover the origi
 | Compiler | Turns source into ELF/PE/Mach-O; may strip names |
 | Ghidra | Lifts bytes → assembly + **approximate C** via decompiler |
 | MCP `c_binary_triage` | One-shot: format, stripped?, main, libc imports, decompile targets |
-| Cursor Assist | Injects program/cursor context; agent calls MCP; you chat in CodeBrowser |
+| Ghidra Assist | Injects program/cursor context; agent calls MCP; you chat in CodeBrowser |
 
 **You get:** recoverable logic, types you apply, renamed `FUN_*`, passwords/flags/IOCs.  
 **You do not get:** original comments, macros, or exact variable names if the binary was stripped.
@@ -28,7 +28,7 @@ Lab cookbook. Goal: analyze **binaries built from C/C++**, not recover the origi
 
 1. Build as usual (`gcc -O0 -g` for easier RE; `-s` / strip for harder).
 2. Import the binary into the lab Ghidra project → **Analyze**.
-3. Window → **Cursor Assist**.
+3. Window → **Ghidra Assist**.
 4. **Tools ▾ → C binary triage** (fills recipe + prints `c_binary_triage` JSON).
 5. **Send** — agent should `decompile_function` on `decompile_first`.
 6. Optional: **Save findings** / sync bookmarks.
@@ -57,7 +57,7 @@ Jangan baca source .c/.cpp dari disk / writeup online.
 | stripped (`-s`) | Mostly `FUN_*`; use libc imports + strings + size heuristics |
 | Sibling pair | Seed `sig_db_add` on named binary → `sig_db_match` on stripped twin |
 
-## Cursor Assist buttons
+## Ghidra Assist buttons
 
 | Action | Use when |
 |--------|----------|

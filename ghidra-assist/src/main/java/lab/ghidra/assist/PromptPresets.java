@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 /**
  * Built-in prompt presets (from prompts/rev-mcp.md + compiled-c-re.md).

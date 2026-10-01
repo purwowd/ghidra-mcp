@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

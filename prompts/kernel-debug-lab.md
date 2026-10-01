@@ -10,7 +10,7 @@ decompile DriverEntry / GsDriverEntry
 # find MajorFunction[IRP_MJ_*] assignments + DeviceIoControl handlers
 ```
 
-Cursor Assist: **Tools ▾ → Kernel triage**.
+Ghidra Assist: **Tools ▾ → Kernel triage**.
 
 ## Live KD playbook
 

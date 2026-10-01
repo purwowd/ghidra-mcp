@@ -1,4 +1,4 @@
-# Ghidra + Cursor MCP — Mac Mini M4 (16 GB)
+# Ghidra + MCP — Mac Mini M4 (16 GB)
 
 ## Status
 
@@ -7,10 +7,10 @@ Installed and wired. MCP only answers while Ghidra GUI is running with CodeBrows
 | Component | Location / version |
 |-----------|-------------------|
 | OpenJDK 21 | `/opt/homebrew/opt/openjdk@21` |
-| Ghidra | 12.1.3 (`brew install ghidra`) → `ghidraRun` |
+| Ghidra | 12.1.4 (`brew install ghidra`) → `ghidraRun` |
 | Heap | `GHIDRA_MAXMEM=4G` (safe default for 16 GB) |
 | MCP plugin | GhidraMCP **7.0.0** in `mcp-server/` (bethington fork, Ghidra 12.x) |
-| Cursor MCP | `~/.cursor/mcp.json` + `.cursor/mcp.json` |
+| MCP (Cursor backend) | `~/.cursor/mcp.json` + `.cursor/mcp.json` |
 | Bridge | `.venv/bin/bridge-mcp-ghidra` + `GHIDRA_MCP_URL=http://127.0.0.1:8089` |
 
 ## Start (recommended)
@@ -29,7 +29,7 @@ Helper script (opens `~/Ghidra/mcp-lab`, waits for MCP, prints next steps):
 ```bash
 cd ~/Developments/personal/ghidra-mcp
 ./scripts/ghidra-lab.sh          # start Ghidra + wait for :8089
-./scripts/ghidra-lab.sh --agent  # same, then enter Cursor Agent chat
+./scripts/ghidra-lab.sh --agent  # same, then enter Cursor chat
 ```
 
 In Ghidra: double-click the target binary → Analyze if prompted.
@@ -39,19 +39,30 @@ Copy-paste prompts: [`prompts/rev-mcp.md`](prompts/rev-mcp.md)
 Agent rules (no reading challenge `.c`): `.cursor/rules/ghidra-mcp-rev.mdc`  
 Source/answer ignore: `.cursorignore`
 
-### In-Ghidra chat (Cursor Assist)
+### In-Ghidra chat (Ghidra Assist)
 
-Panel chat di CodeBrowser → Cursor Agent CLI + GhidraMCP:
+Panel chat di CodeBrowser → Cursor atau DeepSeek backend + GhidraMCP:
 
 ```bash
-./scripts/build-cursor-assist.sh   # build + install extension
+./scripts/build-ghidra-assist.sh   # build + install extension
 ```
 
-Restart Ghidra → enable **GhidraCursorAssistPlugin** → **Window → Cursor Assist**.
+Restart Ghidra → enable **GhidraAssistPlugin** → **Window → Ghidra Assist**.
 
 Fitur panel: **Ping MCP**, preset prompts (Symbols/Stripped/Generic/Crackme100), markdown transcript, status tool MCP, filter noise stream-json, `--force` auto-approve tools.
 
-Detail: [`ghidra-cursor-assist/README.md`](ghidra-cursor-assist/README.md)
+Detail: [`ghidra-assist/README.md`](ghidra-assist/README.md)
+
+### DeepSeek backend (opsional, tanpa Cursor)
+
+1. Set key — salah satu cukup:
+   - **Tool Options → Ghidra Assist → DeepSeek API key**, atau
+   - `export DEEPSEEK_API_KEY=sk-…` lalu jalankan Ghidra dari terminal, atau
+   - **Tools ▾ → Store DeepSeek key (Keychain)…** (simpan di macOS Keychain).
+2. Di panel pilih backend **DeepSeek V4 Pro** atau **DeepSeek Flash**.
+3. Model id: `deepseek-v4-pro` / `deepseek-flash` (bisa diubah di Tool Options).
+
+> Live check: `curl -s http://127.0.0.1:8089/mcp/schema` → `"count": 265` tools (Ghidra 12.1.4).
 
 Manual fallback:
 

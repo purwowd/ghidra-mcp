@@ -33,7 +33,7 @@ snapshot → copy sample (guest) → detonate → collect → revert → Ghidra 
 ```
 
 MCP: `detonation_playbook`  
-Cursor Assist: **Tools ▾ → Detonation playbook**
+Ghidra Assist: **Tools ▾ → Detonation playbook**
 
 ## Layout
 

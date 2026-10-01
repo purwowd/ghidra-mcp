@@ -50,7 +50,7 @@ Requires CodeBrowser Debugger view active.
 - `diff_functions` / `find_similar_functions_fuzzy` — deeper
 - `get_cfg_slice` — blocks + edges for agent navigation
 
-## Cursor Assist
+## Ghidra Assist
 
 - Click `0x…` / `FUN_…` links in transcript → GoTo
 - **Save findings** or auto-append on turn complete → `findings/<program>/findings.md`
@@ -60,13 +60,13 @@ Requires CodeBrowser Debugger view active.
 
 - `c_binary_triage` — format, stripped?, main/entry, libc imports, `decompile_first`
 - Cookbook: `prompts/compiled-c-re.md`
-- Cursor Assist: **Tools ▾ → C binary triage**
+- Ghidra Assist: **Tools ▾ → C binary triage**
 
 ## Linux / macOS flow (unpack + how it works)
 
 - `program_flow_report` — packer/unpack + call graph + CFG summary + deliverable outline
 - Cookbook: `prompts/unix-elf-macho-re.md`
-- Cursor Assist: **Tools ▾ → App flow**
+- Ghidra Assist: **Tools ▾ → App flow**
 
 ## Emulation (already present)
 

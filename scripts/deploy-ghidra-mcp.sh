@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build + deploy GhidraMCP into the user Ghidra 12.1.3 Extensions folder.
+# Build + deploy GhidraMCP into the user Ghidra 12.1.4 Extensions folder.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ZIP="$ROOT/mcp-server/target/GhidraMCP-7.0.0.zip"
-EXT="${GHIDRA_USER_EXTENSIONS:-$HOME/Library/ghidra/ghidra_12.1.3_PUBLIC/Extensions}"
+EXT="${GHIDRA_USER_EXTENSIONS:-$HOME/Library/ghidra/ghidra_12.1.4_PUBLIC/Extensions}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 
 if [[ "$SKIP_BUILD" != "1" ]]; then

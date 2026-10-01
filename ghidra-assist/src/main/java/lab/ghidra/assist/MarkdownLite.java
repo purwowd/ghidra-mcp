@@ -1,4 +1,7 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Tiny markdown → HTML for the chat transcript panel.
@@ -38,24 +41,32 @@ public final class MarkdownLite {
     }
 
     private static String lightCss() {
-        return "body{font-family:SansSerif;font-size:12pt;margin:8px;color:#1a1a1a;background:#ffffff;}" +
-            "h2{font-size:14pt;margin:12px 0 6px 0;}" +
-            "h3{font-size:13pt;margin:10px 0 4px 0;}" +
-            "pre,code{font-family:Monospaced;font-size:11pt;}" +
-            "pre{background:#f4f4f4;padding:8px;border:1px solid #ddd;color:#111;}" +
-            "a{color:#0b57d0;text-decoration:underline;}" +
+        return "body{font-family:SansSerif;font-size:12pt;margin:10px;color:#1a1a1a;background:#ffffff;}" +
+            "h2{font-size:14pt;margin:14px 0 6px 0;}" +
+            "h3{font-size:13pt;margin:12px 0 4px 0;}" +
+            "pre,code{font-family:Monospaced;}" +
+            "pre{background:#f4f4f4;padding:10px;border:1px solid #ddd;color:#111;font-size:11pt;}" +
+            "code{background:#eef1f6;padding:1px 4px;color:#b3261e;font-size:11pt;}" +
+            "a{color:#0b57d0;text-decoration:none;}" +
+            "table{border:1px solid #ccc;margin:8px 0;}" +
+            "th{background:#eceff4;color:#111;font-family:Monospaced;font-size:11pt;padding:4px 8px;}" +
+            "td{color:#1a1a1a;font-family:Monospaced;font-size:11pt;padding:3px 8px;border-top:1px solid #ddd;}" +
             ".you{color:#0b57d0;font-weight:bold;margin-top:14px;}" +
             ".asst{color:#1b5e20;font-weight:bold;margin-top:10px;}" +
             ".sys{color:#666;font-style:italic;margin-top:8px;}";
     }
 
     private static String darkCss() {
-        return "body{font-family:SansSerif;font-size:12pt;margin:8px;color:#e6e6e6;background:#2b2b2b;}" +
-            "h2{font-size:14pt;margin:12px 0 6px 0;color:#f0f0f0;}" +
-            "h3{font-size:13pt;margin:10px 0 4px 0;color:#f0f0f0;}" +
-            "pre,code{font-family:Monospaced;font-size:11pt;}" +
-            "pre{background:#1e1e1e;padding:8px;border:1px solid #444;color:#dcdcdc;}" +
-            "a{color:#7cb7ff;text-decoration:underline;}" +
+        return "body{font-family:SansSerif;font-size:12pt;margin:10px;color:#e6e6e6;background:#2b2b2b;}" +
+            "h2{font-size:14pt;margin:14px 0 6px 0;color:#f0f0f0;}" +
+            "h3{font-size:13pt;margin:12px 0 4px 0;color:#f0f0f0;}" +
+            "pre,code{font-family:Monospaced;}" +
+            "pre{background:#1e1e1e;padding:10px;border:1px solid #444;color:#dcdcdc;font-size:11pt;}" +
+            "code{background:#3a3a3a;padding:1px 4px;color:#ffd580;font-size:11pt;}" +
+            "a{color:#7cb7ff;text-decoration:none;}" +
+            "table{border:1px solid #555;margin:8px 0;}" +
+            "th{background:#3a3a3a;color:#f0f0f0;font-family:Monospaced;font-size:11pt;padding:4px 8px;}" +
+            "td{color:#e6e6e6;font-family:Monospaced;font-size:11pt;padding:3px 8px;border-top:1px solid #444;}" +
             ".you{color:#7cb7ff;font-weight:bold;margin-top:14px;}" +
             ".asst{color:#9ccc65;font-weight:bold;margin-top:10px;}" +
             ".sys{color:#9e9e9e;font-style:italic;margin-top:8px;}";
@@ -67,7 +78,8 @@ public final class MarkdownLite {
         boolean inCode = false;
         StringBuilder code = new StringBuilder();
 
-        for (String line : lines) {
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
             if (line.startsWith("```")) {
                 if (inCode) {
                     out.append("<pre>").append(linkifyAddresses(escape(code.toString()))).append("</pre>");
@@ -84,6 +96,18 @@ public final class MarkdownLite {
                     code.append('\n');
                 }
                 code.append(line);
+                continue;
+            }
+
+            // GFM table block: consecutive lines starting with '|'
+            if (line.trim().startsWith("|")) {
+                List<String> tbl = new ArrayList<>();
+                tbl.add(line.trim());
+                while (i + 1 < lines.length && lines[i + 1].trim().startsWith("|")) {
+                    i++;
+                    tbl.add(lines[i].trim());
+                }
+                out.append(renderTable(tbl));
                 continue;
             }
 
@@ -130,6 +154,50 @@ public final class MarkdownLite {
             out.append("<pre>").append(linkifyAddresses(escape(code.toString()))).append("</pre>");
         }
         return out.toString();
+    }
+
+    private static String renderTable(List<String> rows) {
+        if (rows.isEmpty()) {
+            return "";
+        }
+        String[] headers = splitRow(rows.get(0));
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table border='1' cellspacing='0' cellpadding='4'>");
+        sb.append("<tr>");
+        for (String h : headers) {
+            sb.append("<th>").append(inline(h.trim())).append("</th>");
+        }
+        sb.append("</tr>");
+        for (int r = 1; r < rows.size(); r++) {
+            if (isSeparator(rows.get(r))) {
+                continue;
+            }
+            String[] cells = splitRow(rows.get(r));
+            sb.append("<tr>");
+            for (int c = 0; c < headers.length; c++) {
+                String v = c < cells.length ? cells[c].trim() : "";
+                sb.append("<td>").append(inline(v)).append("</td>");
+            }
+            sb.append("</tr>");
+        }
+        sb.append("</table>");
+        return sb.toString();
+    }
+
+    private static boolean isSeparator(String row) {
+        String stripped = row.replace("|", "").replace(":", "").replace("-", "").replace(" ", "");
+        return stripped.isEmpty() && row.contains("-");
+    }
+
+    private static String[] splitRow(String row) {
+        String s = row.trim();
+        if (s.startsWith("|")) {
+            s = s.substring(1);
+        }
+        if (s.endsWith("|")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s.split("\\|", -1);
     }
 
     private static String inline(String s) {

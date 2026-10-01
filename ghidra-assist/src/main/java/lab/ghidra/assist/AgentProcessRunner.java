@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -43,17 +43,17 @@ public class AgentProcessRunner {
         }
 
         public static Config fromOptions(Options opts) {
-            String agent = opts.getString(GhidraCursorAssistPlugin.OPT_AGENT_PATH, "").trim();
+            String agent = opts.getString(GhidraAssistPlugin.OPT_AGENT_PATH, "").trim();
             if (agent.isEmpty()) {
                 agent = resolveDefaultAgent();
             }
-            String workspace = opts.getString(GhidraCursorAssistPlugin.OPT_WORKSPACE, "").trim();
+            String workspace = opts.getString(GhidraAssistPlugin.OPT_WORKSPACE, "").trim();
             if (workspace.isEmpty()) {
                 workspace = System.getProperty("user.home") + "/Developments/personal/ghidra-mcp";
             }
-            String model = opts.getString(GhidraCursorAssistPlugin.OPT_MODEL, "").trim();
-            String extra = opts.getString(GhidraCursorAssistPlugin.OPT_EXTRA_ARGS, "").trim();
-            String mcp = opts.getString(GhidraCursorAssistPlugin.OPT_MCP_URL, "").trim();
+            String model = opts.getString(GhidraAssistPlugin.OPT_MODEL, "").trim();
+            String extra = opts.getString(GhidraAssistPlugin.OPT_EXTRA_ARGS, "").trim();
+            String mcp = opts.getString(GhidraAssistPlugin.OPT_MCP_URL, "").trim();
             if (mcp.isEmpty()) {
                 mcp = "http://127.0.0.1:8089";
             }
@@ -135,7 +135,7 @@ public class AgentProcessRunner {
         }
         cmd.add(prompt);
 
-        listener.onStatus("Starting Cursor Agent…");
+        listener.onStatus("Starting Cursor…");
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         String path = pb.environment().getOrDefault("PATH", "");

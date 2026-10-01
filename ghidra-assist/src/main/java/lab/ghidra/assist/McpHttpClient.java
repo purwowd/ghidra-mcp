@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;

@@ -2,7 +2,7 @@
 # ghidra-mcp lab monorepo — root .gitignore
 # =============================================================================
 # mcp-server/ has its own detailed ignore for the upstream GhidraMCP tree.
-# This file covers the lab wrapper: Cursor Assist, samples, scripts, macos.
+# This file covers the lab wrapper: Ghidra Assist, samples, scripts, macos.
 # =============================================================================
 
 # ----- OS -----
@@ -74,7 +74,7 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
-# ----- Cursor Assist / agent runtime -----
+# ----- Ghidra Assist / agent runtime -----
 findings/
 **/findings/
 .cursor/agent-transcripts/

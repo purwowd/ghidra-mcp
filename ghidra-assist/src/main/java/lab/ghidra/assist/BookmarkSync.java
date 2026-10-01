@@ -1,4 +1,4 @@
-package lab.ghidra.cursorassist;
+package lab.ghidra.assist;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -19,7 +19,7 @@ import ghidra.program.model.listing.Program;
  */
 public final class BookmarkSync {
 
-    public static final String CATEGORY = "CursorAssist";
+    public static final String CATEGORY = "GhidraAssist";
     private static final Pattern ADDR = Pattern.compile("0x[0-9a-fA-F]{4,}");
 
     private BookmarkSync() {
@@ -48,7 +48,7 @@ public final class BookmarkSync {
         Set<String> seen = new HashSet<>();
         if (findingsMarkdown != null) {
             Matcher m = ADDR.matcher(findingsMarkdown);
-            int tx = program.startTransaction("CursorAssist bookmark sync");
+            int tx = program.startTransaction("GhidraAssist bookmark sync");
             boolean ok = false;
             try {
                 BookmarkManager bm = program.getBookmarkManager();

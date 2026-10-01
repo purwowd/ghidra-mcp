@@ -111,9 +111,9 @@ Import notes: `samples/ctf-rev-public/README.md`
 # cek saja (Ghidra sudah jalan)
 ./scripts/ghidra-lab.sh --no-launch
 
-# in-Ghidra chat panel (Cursor Assist)
-./scripts/build-cursor-assist.sh
-# lalu Window → Cursor Assist di CodeBrowser
+# in-Ghidra chat panel (Ghidra Assist)
+./scripts/build-ghidra-assist.sh
+# lalu Window → Ghidra Assist di CodeBrowser
 ```
 
 ---
