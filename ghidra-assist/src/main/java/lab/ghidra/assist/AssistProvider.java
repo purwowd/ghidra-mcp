@@ -48,7 +48,7 @@ public class AssistProvider extends ComponentProvider {
 
     private static final String BACKEND_CURSOR = "Cursor";
     private static final String BACKEND_DS_V4_PRO = "DeepSeek V4 Pro";
-    private static final String BACKEND_DS_FLASH = "DeepSeek Flash";
+    private static final String BACKEND_DS_FLASH = "DeepSeek V4.1 Flash";
 
     private final GhidraAssistPlugin plugin;
     private final JPanel mainPanel;
@@ -932,7 +932,8 @@ public class AssistProvider extends ComponentProvider {
         }
         String baseUrl = opts.getString(GhidraAssistPlugin.OPT_DS_BASE_URL,
             "https://api.deepseek.com");
-        DeepSeekRunner.Config cfg = new DeepSeekRunner.Config(key, baseUrl, modelId, mcpUrl);
+        String effort = opts.getString(GhidraAssistPlugin.OPT_DS_EFFORT, "low");
+        DeepSeekRunner.Config cfg = new DeepSeekRunner.Config(key, baseUrl, modelId, mcpUrl, effort);
 
         setStatus("Thinking (DeepSeek " + backend + ")…");
         Thread t = new Thread(() -> {

@@ -23,7 +23,7 @@ Restart Ghidra → CodeBrowser → **File → Configure** → enable **GhidraAss
 ## Panel features
 
 - Compact header: MCP status **dot** + program name + **backend/model ▾** + **Context** / preset **Prompt** / **Tools ▾** / **New**
-- **Backend ▾**: `Cursor` (default), `DeepSeek V4 Pro`, `DeepSeek Flash`
+- **Backend ▾**: `Cursor` (default), `DeepSeek V4 Pro`, `DeepSeek V4.1 Flash`
 - **Tools** menu: Ping MCP, C binary triage, Malware triage, **Unpack / Detonation / Kernel**, Break WinAPI, Debug strcmp, Patch, Sync bookmarks, Save findings
 - Presets: Symbols / Stripped / **C RE** (default for any other program)
 - Composer (Send / Stop); thinking indicator while agent runs; status line truncates long text
@@ -44,7 +44,7 @@ Restart Ghidra → CodeBrowser → **File → Configure** → enable **GhidraAss
 | DeepSeek API key | (empty → `DEEPSEEK_API_KEY` env) |
 | DeepSeek base URL | `https://api.deepseek.com` |
 | DeepSeek V4 Pro model id | `deepseek-v4-pro` |
-| DeepSeek Flash model id | `deepseek-flash` |
+| DeepSeek V4.1 Flash model id | `deepseek-flash` |
 
 ## Backends
 

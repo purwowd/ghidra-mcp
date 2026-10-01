@@ -47,14 +47,16 @@ public final class DeepSeekRunner {
         public final String baseUrl;
         public final String model;
         public final String mcpUrl;
+        public final String effort;
 
-        public Config(String apiKey, String baseUrl, String model, String mcpUrl) {
+        public Config(String apiKey, String baseUrl, String model, String mcpUrl, String effort) {
             this.apiKey = apiKey;
             this.baseUrl = baseUrl == null || baseUrl.isBlank()
                 ? "https://api.deepseek.com" : baseUrl;
             this.model = model == null || model.isBlank() ? "deepseek-v4-pro" : model;
             this.mcpUrl = mcpUrl == null || mcpUrl.isBlank()
                 ? "http://127.0.0.1:8089" : mcpUrl;
+            this.effort = effort == null || effort.isBlank() ? "low" : effort;
         }
     }
 
@@ -136,6 +138,9 @@ public final class DeepSeekRunner {
             iteration++;
             JsonObject req = new JsonObject();
             req.addProperty("model", cfg.model);
+            if (cfg.effort != null && !cfg.effort.isBlank()) {
+                req.addProperty("effort", cfg.effort);
+            }
             req.add("messages", messages);
             if (!tools.isEmpty()) {
                 req.add("tools", buildToolsJson(tools));
@@ -193,7 +198,7 @@ public final class DeepSeekRunner {
 
     private StreamResult streamChat(Config cfg, JsonObject req, Listener listener) throws Exception {
         String url = cfg.baseUrl.replaceAll("/$", "") + "/chat/completions";
-        HttpURLConnection conn = open(url, 15000, 600000);
+        HttpURLConnection conn = open(url, 15000, 120000);
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
         conn.setRequestProperty("Authorization", "Bearer " + cfg.apiKey);

@@ -33,7 +33,8 @@ public class GhidraAssistPlugin extends ProgramPlugin {
     public static final String OPT_DS_API_KEY = "DeepSeek API key";
     public static final String OPT_DS_BASE_URL = "DeepSeek base URL";
     public static final String OPT_DS_MODEL_V4_PRO = "DeepSeek V4 Pro model id";
-    public static final String OPT_DS_MODEL_FLASH = "DeepSeek Flash model id";
+    public static final String OPT_DS_MODEL_FLASH = "DeepSeek V4.1 Flash model id";
+    public static final String OPT_DS_EFFORT = "DeepSeek effort";
 
     private AssistProvider provider;
 
@@ -68,7 +69,9 @@ public class GhidraAssistPlugin extends ProgramPlugin {
         options.registerOption(OPT_DS_MODEL_V4_PRO, "deepseek-v4-pro", help,
             "API model id used when the panel selects DeepSeek V4 Pro");
         options.registerOption(OPT_DS_MODEL_FLASH, "deepseek-flash", help,
-            "API model id used when the panel selects DeepSeek Flash");
+            "API model id used when the panel selects DeepSeek V4.1 Flash");
+        options.registerOption(OPT_DS_EFFORT, "low", help,
+            "DeepSeek effort level: low (fast), high, or max");
     }
 
     Options getAssistOptions() {

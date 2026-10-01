@@ -59,7 +59,7 @@ Detail: [`ghidra-assist/README.md`](ghidra-assist/README.md)
    - **Tool Options → Ghidra Assist → DeepSeek API key**, atau
    - `export DEEPSEEK_API_KEY=sk-…` lalu jalankan Ghidra dari terminal, atau
    - **Tools ▾ → Store DeepSeek key (Keychain)…** (simpan di macOS Keychain).
-2. Di panel pilih backend **DeepSeek V4 Pro** atau **DeepSeek Flash**.
+2. Di panel pilih backend **DeepSeek V4 Pro** atau **DeepSeek V4.1 Flash**.
 3. Model id: `deepseek-v4-pro` / `deepseek-flash` (bisa diubah di Tool Options).
 
 > Live check: `curl -s http://127.0.0.1:8089/mcp/schema` → `"count": 265` tools (Ghidra 12.1.4).
